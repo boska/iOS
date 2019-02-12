@@ -21,6 +21,8 @@ import WebKit
 import Core
 import Device
 import StoreKit
+import Intents
+import IntentsUI
 
 // swiftlint:disable file_length
 // swiftlint:disable type_body_length
@@ -70,6 +72,8 @@ class TabViewController: UIViewController {
     private var shouldReloadOnError = false
     private var failingUrls = Set<String>()
     private var tearDownCount = 0
+    
+    private weak var addToSiriButton: UIView?
     
     public var url: URL? {
         didSet {
@@ -137,6 +141,29 @@ class TabViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         addContentBlockerConfigurationObserver()
+        
+        if #available(iOS 12, *) {
+            let button = INUIAddVoiceShortcutButton(style: .blackOutline)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.delegate = self
+            view.addSubview(button)
+            view.bringSubviewToFront(button)
+            
+            view.addConstraint(NSLayoutConstraint(item: button, attribute: .bottom,
+                                                    relatedBy: .equal,
+                                                    toItem: view, attribute: .bottom,
+                                                    multiplier: 1.0, constant: -20))
+            
+            view.addConstraint(NSLayoutConstraint(item: button, attribute: .right,
+                                                    relatedBy: .equal,
+                                                    toItem: view, attribute: .right,
+                                                    multiplier: 1.0, constant: -20))
+
+            button.isHidden = true
+            
+            addToSiriButton = button
+        }
+        
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -648,6 +675,25 @@ extension TabViewController: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if let url = webView.url,
+            let search = appUrls.searchQuery(fromUrl: url),
+            #available(iOS 12, *),
+            let addToSiriButton = addToSiriButton as? INUIAddVoiceShortcutButton {
+
+            addToSiriButton.isHidden = false
+
+            let userActivity = NSUserActivity(activityType: "SearchActivity")
+            userActivity.userInfo = ["search": search] //and other userActivity properties
+            userActivity.suggestedInvocationPhrase = "\(search)"
+            userActivity.title = "Search for \(search) using DuckDuckGo Privacy Browser"
+            addToSiriButton.shortcut = INShortcut(userActivity: userActivity)
+            
+        } else {
+            
+            addToSiriButton?.isHidden = true
+            
+        }
+        
         lastError = nil
         shouldReloadOnError = false
         hideErrorMessage()
@@ -865,4 +911,47 @@ extension TabViewController: UIGestureRecognizerDelegate {
         return gestureRecognizer == showBarsTapGestureRecogniser || gestureRecognizer == longPressGestureRecognizer
     }
 }
+
+@available(iOS 12, *)
+extension TabViewController: INUIAddVoiceShortcutButtonDelegate {
+    
+    func present(_ addVoiceShortcutViewController: INUIAddVoiceShortcutViewController, for addVoiceShortcutButton: INUIAddVoiceShortcutButton) {
+        addVoiceShortcutViewController.delegate = self
+        present(addVoiceShortcutViewController, animated: true, completion: nil)
+    }
+    
+    func present(_ editVoiceShortcutViewController: INUIEditVoiceShortcutViewController, for addVoiceShortcutButton: INUIAddVoiceShortcutButton) {
+        editVoiceShortcutViewController.delegate = self
+        present(editVoiceShortcutViewController, animated: true, completion: nil)
+    }
+    
+}
+
+@available(iOS 12, *)
+extension TabViewController: INUIAddVoiceShortcutViewControllerDelegate, INUIEditVoiceShortcutViewControllerDelegate {
+    
+    func addVoiceShortcutViewController(_ controller: INUIAddVoiceShortcutViewController,
+                                        didFinishWith voiceShortcut: INVoiceShortcut?, error: Error?) {
+        controller.dismiss(animated: true, completion: nil)
+    }
+    
+    func addVoiceShortcutViewControllerDidCancel(_ controller: INUIAddVoiceShortcutViewController) {
+        controller.dismiss(animated: true, completion: nil)
+    }
+    
+    func editVoiceShortcutViewController(_ controller: INUIEditVoiceShortcutViewController,
+                                         didUpdate voiceShortcut: INVoiceShortcut?, error: Error?) {
+        controller.dismiss(animated: true, completion: nil)
+    }
+    
+    func editVoiceShortcutViewController(_ controller: INUIEditVoiceShortcutViewController,
+                                         didDeleteVoiceShortcutWithIdentifier deletedVoiceShortcutIdentifier: UUID) {
+        controller.dismiss(animated: true, completion: nil)
+    }
+    
+    func editVoiceShortcutViewControllerDidCancel(_ controller: INUIEditVoiceShortcutViewController) {
+        controller.dismiss(animated: true, completion: nil)
+    }
+}
+
 // swiftlint:enable file_length

@@ -55,7 +55,7 @@
 	<string>Allows you to upload photographs and videos</string>
 	<key>NSUserActivityTypes</key>
 	<array>
-		<string>com.duckduckgo.mobile.ios.search</string>
+		<string>SearchActivity</string>
 	</array>
 	<key>UIAppFonts</key>
 	<array>
