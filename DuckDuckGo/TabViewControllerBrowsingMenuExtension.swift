@@ -19,6 +19,8 @@
 
 import UIKit
 import Core
+import Intents
+import SiriKit
 
 extension TabViewController {
     
@@ -33,6 +35,11 @@ extension TabViewController {
         }
         
         if let link = link, !isError {
+
+            if let action = buildAddToSiriAction(forLink: link) {
+                alert.addAction(action)
+            }
+            
             if let action = buildSaveBookmarkAction(forLink: link) {
                 alert.addAction(action)
             }
@@ -63,6 +70,23 @@ extension TabViewController {
         }
         alert.addAction(title: UserText.actionCancel, style: .cancel)
         return alert
+    }
+    
+    private func buildAddToSiriAction(forLink link: Link) -> UIAlertAction? {
+        guard #available(iOS 12, *) else { return nil }
+        guard appUrls.isDuckDuckGoSearch(url: link.url) else { return nil }
+        guard let search = appUrls.searchQuery(fromUrl: link.url) else { return nil }
+        
+        return UIAlertAction(title: "Add to Siri", style: .default) { [weak self] _ in
+            
+            let activity = NSUserActivity(activityType: "com.duckduckgo.mobile.ios.search")
+            activity.title = "Search DuckDuckGo for " + search
+            activity.userInfo = [ "search": search ]
+            activity.isEligibleForSearch = true
+            activity.isEligibleForPrediction = true
+            activity.persistentIdentifier = NSUserActivityPersistentIdentifier(stringLiteral: "com.duckduckgo.mobile.ios.search")
+            
+        }
     }
     
     private func onRefreshAction() {
